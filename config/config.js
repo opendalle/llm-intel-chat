@@ -19,7 +19,7 @@ const CONFIG = {
   // ----- Ollama (local LLM) -----
   // Must be running on the same machine as the browser (CORS is relaxed for localhost)
   OLLAMA_URL:         'http://localhost:11434',
-  OLLAMA_MODEL:       'mistral',          // change to llama3, phi3, gemma2, etc.
+  OLLAMA_MODEL:       'gemma3:4b',          // change to llama3, phi3, gemma2, etc.
   OLLAMA_TIMEOUT_MS:  60000,              // 60 s timeout for LLM calls
 
   // ----- Platform settings -----
