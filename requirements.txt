@@ -1,0 +1,29 @@
+# NEXUS ASIA CRE Intelligence Platform — Python Dependencies
+# Install with: pip install -r requirements.txt
+
+# HTTP & HTML Parsing
+requests==2.31.0
+beautifulsoup4==4.12.3
+lxml==5.1.0
+httpx==0.27.0
+
+# Supabase Python Client
+supabase==2.4.0
+
+# Environment variable management
+python-dotenv==1.0.1
+
+# Scheduling (for local dev; GitHub Actions handles production scheduling)
+schedule==1.2.1
+
+# NLP / text processing
+regex==2023.12.25
+
+# Date handling
+python-dateutil==2.9.0
+
+# Rate limiting & retries
+tenacity==8.2.3
+
+# Logging
+loguru==0.7.2

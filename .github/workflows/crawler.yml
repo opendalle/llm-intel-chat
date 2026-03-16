@@ -1,0 +1,101 @@
+name: "NEXUS ASIA CRE Crawler — 30-Minute Intelligence Run"
+
+on:
+  # Auto-run every 30 minutes (production schedule)
+  schedule:
+    - cron: '*/30 * * * *'
+
+  # Allow manual trigger from GitHub Actions UI
+  workflow_dispatch:
+    inputs:
+      crawler:
+        description: 'Which crawler to run'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - news
+          - nclt
+          - mca
+
+# Prevent concurrent runs to avoid duplicate DB insertions
+concurrency:
+  group: cre-crawler
+  cancel-in-progress: false
+
+jobs:
+  crawl:
+    name: "Run CRE Intelligence Crawlers"
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    env:
+      SUPABASE_URL:         ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      OLLAMA_URL:           ""   # Ollama runs locally — crawlers don't need it
+
+    steps:
+      # ── 1. Checkout repository ─────────────────────────────
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── 2. Set up Python ───────────────────────────────────
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      # ── 3. Install Python dependencies ────────────────────
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # ── 4. Validate Supabase credentials ──────────────────
+      - name: Validate environment
+        run: |
+          if [ -z "$SUPABASE_URL" ]; then
+            echo "❌ SUPABASE_URL secret is not set. Add it in GitHub repository Settings > Secrets."
+            exit 1
+          fi
+          if [ -z "$SUPABASE_SERVICE_KEY" ]; then
+            echo "❌ SUPABASE_SERVICE_KEY secret is not set."
+            exit 1
+          fi
+          echo "✅ Credentials found. Running crawlers..."
+
+      # ── 5. Run News Crawler (ET, BS, Mint, Reuters) ────────
+      - name: Run News Crawler
+        if: ${{ github.event.inputs.crawler == 'all' || github.event.inputs.crawler == 'news' || github.event_name == 'schedule' }}
+        working-directory: crawler
+        run: |
+          echo "=== News Crawler ==="
+          python crawler_news.py
+        continue-on-error: true     # Don't fail pipeline if one source is down
+
+      # ── 6. Run NCLT / IBBI Crawler ─────────────────────────
+      - name: Run NCLT / IBBI Crawler
+        if: ${{ github.event.inputs.crawler == 'all' || github.event.inputs.crawler == 'nclt' || github.event_name == 'schedule' }}
+        working-directory: crawler
+        run: |
+          echo "=== NCLT / IBBI Crawler ==="
+          python crawler_nclt.py
+        continue-on-error: true
+
+      # ── 7. Run MCA / SARFAESI Crawler ─────────────────────
+      - name: Run MCA / SARFAESI Crawler
+        if: ${{ github.event.inputs.crawler == 'all' || github.event.inputs.crawler == 'mca' || github.event_name == 'schedule' }}
+        working-directory: crawler
+        run: |
+          echo "=== MCA / SARFAESI Crawler ==="
+          python crawler_mca.py
+        continue-on-error: true
+
+      # ── 8. Summary ─────────────────────────────────────────
+      - name: Print summary
+        run: |
+          echo "==================================="
+          echo "  NEXUS ASIA Crawler Run Complete"
+          echo "  Time: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "  Repo: ${{ github.repository }}"
+          echo "==================================="
