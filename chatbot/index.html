@@ -102,7 +102,7 @@ AI Research Chatbot
 <div class="header-right">
 <div class="header-stat">Distress <span id="distress-count">—</span></div>
 <div class="header-stat">DB: Supabase</div>
-<div class="header-stat">LLM: Hybrid</div>
+<div class="header-stat">LLM: <span id="llm-provider">—</span></div>
 </div>
 
 </header>
@@ -369,6 +369,18 @@ document.getElementById(`tab-${tabId}`)
 
 </script>
 
+<script>
+document.addEventListener('DOMContentLoaded', () => {
 
+  const sbEl = document.getElementById('info-sb-url');
+  const olEl = document.getElementById('info-ol-url');
+  const mdEl = document.getElementById('info-model');
+
+  if (sbEl) sbEl.textContent = CONFIG.SUPABASE_URL || '—';
+  if (olEl) olEl.textContent = CONFIG.OLLAMA_URL || '—';
+  if (mdEl) mdEl.textContent = CONFIG.OLLAMA_MODEL || '—';
+
+});
+</script>
 </body>
 </html>
