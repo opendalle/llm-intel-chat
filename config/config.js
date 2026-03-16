@@ -13,8 +13,8 @@
 
 const CONFIG = {
   // ----- Supabase -----
-  SUPABASE_URL:       'https://YOUR_PROJECT_ID.supabase.co',
-  SUPABASE_ANON_KEY:  'YOUR_SUPABASE_ANON_PUBLIC_KEY',
+  SUPABASE_URL:       'https://rnplyxhhfmxloqrhlnaa.supabase.co',
+  SUPABASE_ANON_KEY:  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJucGx5eGhoZm14bG9xcmhsbmFhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2NTk2MzcsImV4cCI6MjA4OTIzNTYzN30.av035W3XqXrN0yB1qRpz1D5TUKjZkbfS3uO8vUw7Cmw',
 
   // ----- Ollama (local LLM) -----
   // Must be running on the same machine as the browser (CORS is relaxed for localhost)
