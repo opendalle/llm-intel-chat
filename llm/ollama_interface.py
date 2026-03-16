@@ -19,7 +19,7 @@ Usage (direct test):
 
 Environment:
   OLLAMA_URL   — default: http://localhost:11434
-  OLLAMA_MODEL — default: mistral
+  OLLAMA_MODEL — default: gemma3:4b
 """
 
 import os
@@ -36,7 +36,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 log = logging.getLogger("ollama")
 
 OLLAMA_URL   = os.environ.get("OLLAMA_URL",   "http://localhost:11434")
-OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "mistral")
+OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "gemma3:4b")
 TIMEOUT      = int(os.environ.get("OLLAMA_TIMEOUT", "60"))
 
 
