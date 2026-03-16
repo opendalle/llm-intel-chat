@@ -1,404 +1,173 @@
-/**
-
-* chatbot.js — NEXUS ASIA CRE Intelligence Platform
-* ============================================================
-* Main orchestrator for the chatbot UI.
-* Wires together: IntentClassifier → SchemaRouter → Retriever → Parser
-*
-* Supports dual LLM providers:
-* • Ollama (local)
-* • Groq (cloud)
-  */
-
 'use strict';
 
-/* ────────────────────────────────────────────────────────────
-STATE
-──────────────────────────────────────────────────────────── */
-
-let _supabase    = null;
-let _chatHistory = [];
-let _ollamaOk    = false;
-
-/* ────────────────────────────────────────────────────────────
-BOOTSTRAP
-──────────────────────────────────────────────────────────── */
+let _supabase = null;
+let _ollamaOk = false;
 
 document.addEventListener('DOMContentLoaded', async () => {
 
 const { createClient } = supabase;
-_supabase = createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+
+_supabase = createClient(
+CONFIG.SUPABASE_URL,
+CONFIG.SUPABASE_ANON_KEY
+);
 
 Retriever.init({
-supabase:   _supabase,
-ollamaUrl:  CONFIG.OLLAMA_URL,
-model:      CONFIG.OLLAMA_MODEL,
-groqApiKey: CONFIG.GROQ_API_KEY,
-groqModel:  CONFIG.GROQ_MODEL,
-provider:   CONFIG.LLM_PROVIDER,
-maxRows:    CONFIG.MAX_ROWS_RETURNED,
-timeoutMs:  CONFIG.OLLAMA_TIMEOUT_MS
+
+supabase:_supabase,
+
+ollamaUrl:CONFIG.OLLAMA_URL,
+model:CONFIG.OLLAMA_MODEL,
+
+groqApiKey:CONFIG.GROQ_API_KEY,
+groqModel:CONFIG.GROQ_MODEL,
+
+provider:CONFIG.LLM_PROVIDER
+
 });
 
-KnowledgeGraph.init(_supabase);
-DataImportPanel.init(_supabase);
-
-await SchemaRouter.loadDynamicDatasets(_supabase);
-
-await checkOllama();
-await loadDashboard();
-await loadDatasetList();
-await loadKGPreview();
-
-bindChatEvents();
-bindNavEvents();
 bindSettingsEvents();
 
-setInterval(loadDashboard, CONFIG.DASHBOARD_REFRESH_MS);
+await checkOllama();
+
+bindChat();
+
 });
 
-/* ────────────────────────────────────────────────────────────
-OLLAMA HEALTH CHECK
-──────────────────────────────────────────────────────────── */
-
-async function checkOllama() {
+async function checkOllama(){
 
 const statusEl = document.getElementById('ollama-status');
+const llmEl = document.getElementById('llm-provider');
 
-if (CONFIG.LLM_PROVIDER === 'Groq') {
-if (statusEl) {
-statusEl.className = 'ollama-badge ok';
-statusEl.textContent = `🚀 Groq · ${CONFIG.GROQ_MODEL}`;
-statusEl.title = 'Cloud LLM active';
+if(CONFIG.LLM_PROVIDER === 'Groq'){
+
+if(statusEl){
+statusEl.className='ollama-badge ok';
+statusEl.textContent=`🚀 Groq · ${CONFIG.GROQ_MODEL}`;
 }
-_ollamaOk = true;
+
+if(llmEl)
+llmEl.textContent=`Groq · ${CONFIG.GROQ_MODEL}`;
+
+_ollamaOk=true;
+
 return;
 }
 
 const health = await Retriever.checkOllamaHealth();
-_ollamaOk = health.ok;
 
-if (statusEl) {
+_ollamaOk=health.ok;
 
-```
-statusEl.className = `ollama-badge ${health.ok ? 'ok' : 'error'}`;
+if(statusEl){
 
-statusEl.textContent = health.ok
-  ? `🟢 Ollama · ${CONFIG.OLLAMA_MODEL}`
-  : `🔴 Ollama offline`;
+statusEl.className=`ollama-badge ${health.ok?'ok':'error'}`;
 
-statusEl.title = health.ok
-  ? `Available models: ${health.models.join(', ')}`
-  : 'Start Ollama: ollama serve';
-```
-
-}
-}
-
-/* ────────────────────────────────────────────────────────────
-CHAT INPUT EVENTS
-──────────────────────────────────────────────────────────── */
-
-function bindChatEvents() {
-
-const input   = document.getElementById('chat-input');
-const sendBtn = document.getElementById('send-btn');
-
-if (sendBtn)
-sendBtn.addEventListener('click', () => submitQuestion());
-
-if (input) {
-
-```
-input.addEventListener('keydown', e => {
-
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault();
-    submitQuestion();
-  }
-
-});
-```
+statusEl.textContent=health.ok
+?`🟢 Ollama · ${CONFIG.OLLAMA_MODEL}`
+:`🔴 Ollama offline`;
 
 }
 
-document.querySelectorAll('.example-chip').forEach(btn => {
-
-```
-btn.addEventListener('click', () => {
-
-  const q = btn.dataset.q;
-
-  if (q) {
-    const input = document.getElementById('chat-input');
-    if (input) {
-      input.value = q;
-      submitQuestion();
-    }
-  }
-
-});
-```
-
-});
+if(llmEl)
+llmEl.textContent=`Ollama · ${CONFIG.OLLAMA_MODEL}`;
 
 }
 
-/* ────────────────────────────────────────────────────────────
-NAVIGATION
-──────────────────────────────────────────────────────────── */
+function bindSettingsEvents(){
 
-function bindNavEvents() {
+const ollamaInput=document.getElementById('setting-ollama-url');
+const modelInput=document.getElementById('setting-model');
 
-document.querySelectorAll('.nav-tab').forEach(tab => {
+const groqKey=document.getElementById('setting-groq-api-key');
+const groqModel=document.getElementById('setting-groq-model');
+const provider=document.getElementById('setting-llm-provider');
 
-```
-tab.addEventListener('click', () => {
+const saveBtn=document.getElementById('save-settings');
 
-  const target = tab.dataset.tab;
+if(ollamaInput)ollamaInput.value=CONFIG.OLLAMA_URL;
+if(modelInput)modelInput.value=CONFIG.OLLAMA_MODEL;
 
-  document.querySelectorAll('.nav-tab')
-    .forEach(t => t.classList.remove('active'));
+if(groqKey)groqKey.value=CONFIG.GROQ_API_KEY||'';
+if(groqModel)groqModel.value=CONFIG.GROQ_MODEL||'mixtral-8x7b-32768';
 
-  document.querySelectorAll('.tab-content')
-    .forEach(p => p.classList.remove('active'));
+if(provider)provider.value=CONFIG.LLM_PROVIDER||'Ollama';
 
-  tab.classList.add('active');
+if(saveBtn){
 
-  const panel = document.getElementById(`tab-${target}`);
-  if (panel) panel.classList.add('active');
+saveBtn.addEventListener('click',async()=>{
 
-  if (target === 'graph')
-    loadKGPreview();
+CONFIG.OLLAMA_URL=ollamaInput.value.trim();
+CONFIG.OLLAMA_MODEL=modelInput.value.trim();
+
+CONFIG.GROQ_API_KEY=groqKey.value.trim();
+CONFIG.GROQ_MODEL=groqModel.value.trim();
+
+CONFIG.LLM_PROVIDER=provider.value;
+
+Retriever.init({
+
+supabase:_supabase,
+
+ollamaUrl:CONFIG.OLLAMA_URL,
+model:CONFIG.OLLAMA_MODEL,
+
+groqApiKey:CONFIG.GROQ_API_KEY,
+groqModel:CONFIG.GROQ_MODEL,
+
+provider:CONFIG.LLM_PROVIDER
 
 });
-```
+
+await checkOllama();
+
+saveBtn.textContent='Saved';
+
+setTimeout(()=>{
+
+saveBtn.textContent='Save Settings';
+
+},2000);
 
 });
 
 }
 
-/* ────────────────────────────────────────────────────────────
-SETTINGS PANEL
-──────────────────────────────────────────────────────────── */
-
-function bindSettingsEvents() {
-
-const ollamaInput    = document.getElementById('setting-ollama-url');
-const modelInput     = document.getElementById('setting-model');
-
-const groqKeyInput   = document.getElementById('setting-groq-api-key');
-const groqModelInput = document.getElementById('setting-groq-model');
-const providerInput  = document.getElementById('setting-llm-provider');
-
-const saveBtn        = document.getElementById('save-settings');
-
-if (ollamaInput) ollamaInput.value = CONFIG.OLLAMA_URL;
-if (modelInput)  modelInput.value  = CONFIG.OLLAMA_MODEL;
-
-if (groqKeyInput)   groqKeyInput.value   = CONFIG.GROQ_API_KEY || '';
-if (groqModelInput) groqModelInput.value = CONFIG.GROQ_MODEL || 'mixtral-8x7b-32768';
-
-if (providerInput)  providerInput.value  = CONFIG.LLM_PROVIDER || 'Ollama';
-
-if (saveBtn) {
-
-```
-saveBtn.addEventListener('click', async () => {
-
-  if (ollamaInput) CONFIG.OLLAMA_URL   = ollamaInput.value.trim();
-  if (modelInput)  CONFIG.OLLAMA_MODEL = modelInput.value.trim();
-
-  if (groqKeyInput)   CONFIG.GROQ_API_KEY = groqKeyInput.value.trim();
-  if (groqModelInput) CONFIG.GROQ_MODEL   = groqModelInput.value.trim();
-
-  if (providerInput)  CONFIG.LLM_PROVIDER = providerInput.value;
-
-
-  Retriever.init({
-
-    supabase:   _supabase,
-
-    ollamaUrl:  CONFIG.OLLAMA_URL,
-    model:      CONFIG.OLLAMA_MODEL,
-
-    groqApiKey: CONFIG.GROQ_API_KEY,
-    groqModel:  CONFIG.GROQ_MODEL,
-
-    provider:   CONFIG.LLM_PROVIDER,
-
-    maxRows:    CONFIG.MAX_ROWS_RETURNED,
-    timeoutMs:  CONFIG.OLLAMA_TIMEOUT_MS
-
-  });
-
-  await checkOllama();
-
-  saveBtn.textContent = '✅ Saved';
-
-  setTimeout(() => {
-    saveBtn.textContent = 'Save Settings';
-  }, 2000);
-
-});
-```
-
 }
 
+function bindChat(){
+
+const sendBtn=document.getElementById('send-btn');
+const input=document.getElementById('chat-input');
+
+sendBtn.addEventListener('click',submitQuestion);
+
+input.addEventListener('keydown',e=>{
+
+if(e.key==='Enter'){
+e.preventDefault();
+submitQuestion();
 }
-
-/* ────────────────────────────────────────────────────────────
-QUESTION PIPELINE
-──────────────────────────────────────────────────────────── */
-
-async function submitQuestion() {
-
-const input    = document.getElementById('chat-input');
-const question = (input?.value || '').trim();
-
-if (!question) return;
-
-input.value = '';
-
-appendUserMessage(question);
-
-_chatHistory.push({ role:'user', content:question });
-
-const thinkingId = appendThinkingMessage();
-
-try {
-
-```
-const intentResult = IntentClassifier.classify(question);
-
-updateThinking(thinkingId,
-  `Intent: <strong>${intentResult.intent}</strong> · City: ${intentResult.city || 'Any'}`);
-
-if (!_ollamaOk)
-  throw new Error('LLM unavailable.');
-
-const schemaContext = SchemaRouter.buildSchemaContext(intentResult.intent);
-
-updateThinking(thinkingId,
-  `Routing to tables: ${SchemaRouter.getTablesForIntent(intentResult.intent).join(', ')}`);
-
-const result = await Retriever.query(question, intentResult, schemaContext);
-
-updateThinking(thinkingId,
-  `Query returned ${result.rowCount} rows`);
-
-const summaryHTML = Parser.renderSummaryCard(result.rows, result.intent);
-const tableHTML   = Parser.renderTable(result.rows);
-
-removeThinking(thinkingId);
-
-appendAssistantMessage({
-
-  question,
-  explanation: result.explanation,
-  sql: result.sql,
-  summaryHTML,
-  tableHTML,
-  rowCount: result.rowCount,
-  intent: result.intent,
-  elapsedMs: result.elapsedMs
 
 });
 
-_chatHistory.push({ role:'assistant', content:result.explanation });
-```
-
 }
 
-catch(err) {
+async function submitQuestion(){
 
-```
-removeThinking(thinkingId);
+const input=document.getElementById('chat-input');
 
-appendErrorMessage(err.message);
+const q=input.value.trim();
 
-console.error(err);
-```
+if(!q)return;
 
-}
+input.value='';
 
-scrollChatToBottom();
+const res = await Retriever.query(
+q,
+{intent:'generic'},
+''
+);
 
-}
-
-/* ────────────────────────────────────────────────────────────
-MESSAGE RENDERING
-──────────────────────────────────────────────────────────── */
-
-function appendUserMessage(text) {
-
-const thread = document.getElementById('chat-thread');
-
-const div = document.createElement('div');
-
-div.className = 'msg msg-user';
-
-div.innerHTML =
-`<div class="msg-avatar">YO</div>
-
-   <div class="msg-body">
-   <p class="msg-text">${escHtml(text)}</p>
-   <span class="msg-time">${formatTime()}</span>
-   </div>`;
-
-thread.appendChild(div);
-
-}
-
-function appendErrorMessage(msg) {
-
-const thread = document.getElementById('chat-thread');
-
-const div = document.createElement('div');
-
-div.className = 'msg msg-ai msg-error';
-
-div.innerHTML =
-`<div class="msg-avatar ai-avatar err">!</div>
-
-   <div class="msg-body">
-   <p class="error-text">${escHtml(msg)}</p>
-   <span class="msg-time">${formatTime()}</span>
-   </div>`;
-
-thread.appendChild(div);
-
-}
-
-/* ────────────────────────────────────────────────────────────
-UTILS
-──────────────────────────────────────────────────────────── */
-
-function scrollChatToBottom() {
-
-const thread = document.getElementById('chat-thread');
-
-if (thread)
-thread.scrollTop = thread.scrollHeight;
-
-}
-
-function escHtml(str) {
-
-if (!str) return '';
-
-return String(str)
-.replace(/&/g,'&')
-.replace(/</g,'<')
-.replace(/>/g,'>');
-
-}
-
-function formatTime() {
-
-return new Date().toLocaleTimeString('en-IN',{
-hour:'2-digit',
-minute:'2-digit'
-});
+console.log(res);
 
 }
